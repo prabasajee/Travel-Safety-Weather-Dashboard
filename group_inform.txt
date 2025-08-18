@@ -8,3 +8,53 @@ Student 4 Name	V.Desanth	ITBNM-2211-0121@horizoncampus.edu.lk
 ITBNM-2211-0121
 Student 5 Name	S.A Mahmood	ITBNM-2211-0153@horizoncampus.edu.lk
 ITBNM-2211-0153
+
+
+
+
+Equal Work Division (5 Members)
+Member 1 – Frontend UI/UX Developer
+
+Design and implement the web interface (HTML, CSS, JavaScript).
+
+Create input field (city/country search) and result display (cards/tables/icons).
+
+Handle user-friendly error messages and loading indicators.
+
+Member 2 – API Integration Specialist
+
+Connect and test the 3 Public APIs:
+
+Travel Advisory API
+
+OpenWeatherMap API
+
+RestCountries API
+
+Normalize/aggregate API data into a unified JSON format.
+
+Handle asynchronous calls (Promise.all) and API rate limits.
+
+Member 3 – Backend Developer
+
+Set up Node.js + Express.js server.
+
+Implement API routes (/submitData, /records).
+
+Handle AJAX POST/GET requests and send responses to client.
+
+Member 4 – Database Manager
+
+Configure MongoDB + Mongoose schemas.
+
+Store and validate incoming JSON data.
+
+Enable secure data retrieval with filtering and querying options.
+
+Member 5 – Security & Testing Lead
+
+Implement OAuth 2.0 authentication and API key validation middleware.
+
+Ensure all communication is over HTTPS.
+
+Write test cases, debug errors, and verify both client & server security.
