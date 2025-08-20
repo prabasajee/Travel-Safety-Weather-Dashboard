@@ -1,0 +1,56 @@
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Database files
+*.sqlite
+*.db
+
+# Build output
+/dist/
+/build/
+
+# Misc
+*.swp
+*.swo
+
+# VS Code settings
+.vscode/
+
+# Coverage
+coverage/
+
+# Ignore config secrets
+config/*.local.js
+config/*.secret.js
+
+# Ignore test output
+/test-output/
+
+# Ignore temp files
+*.tmp
+*.temp
+
+# Ignore package-lock
+package-lock.json
+yarn.lock
+
+# Ignore backup files
+*.bak
+
+# Ignore group info
+group_inform.txt
