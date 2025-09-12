@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, FormEvent } from 'react';
 import { motion } from 'motion/react';
 import { Eye, EyeOff, Globe, Mail, Lock, User, Plane } from 'lucide-react';
 import { Button } from './ui/button';
@@ -13,6 +13,7 @@ interface AuthPageProps {
 
 export function AuthPage({ onLogin }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(true);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,19 +26,52 @@ export function AuthPage({ onLogin }: AuthPageProps) {
     confirmPassword: ''
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      onLogin({
-        name: formData.name || 'John Traveler',
-        email: formData.email || 'john@example.com',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face'
+
+    const endpoint = isLogin
+      ? 'http://localhost:5000/api/auth/login'
+      : 'http://localhost:5000/api/auth/register';
+
+    const payload = isLogin
+      ? { email: formData.email, password: formData.password }
+      : {
+          username: formData.name,
+          email: formData.email,
+          password: formData.password,
+        };
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-    }, 2000);
+
+      const data = await res.json();
+      setIsLoading(false);
+
+      if (!res.ok) {
+        alert(data.msg || 'Authentication failed');
+        return;
+      }
+
+      if (isLogin) {
+        // Store JWT token
+        localStorage.setItem('token', data.token);
+        // Pass user data to parent
+        onLogin(data.user);
+      } else {
+        // Registration success: show message and switch to login
+        setRegisterSuccess(true);
+        setIsLogin(true);
+        setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+      }
+    } catch (err) {
+      setIsLoading(false);
+      alert('Server error');
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -98,6 +132,11 @@ export function AuthPage({ onLogin }: AuthPageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {registerSuccess && (
+                <div className="mb-4 text-green-600 text-center font-semibold">
+                  Registration successful! Please check your email to verify your account and then log in.
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-4">
                 {!isLogin && (
                   <motion.div
