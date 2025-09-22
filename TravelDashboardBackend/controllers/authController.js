@@ -1,55 +1,84 @@
 
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
+const { verifyFirebaseToken, getFirebaseUser } = require('../config/firebase');
 
-// REGISTER with email verification and token response
-exports.registerUser = async (req, res) => {
-    const { username, email, password } = req.body;
+// Verify Firebase ID token (this replaces login/register as Firebase handles that)
+exports.verifyToken = async (req, res) => {
+    const { idToken } = req.body;
+    
+    if (!idToken) {
+        return res.status(400).json({ msg: 'No ID token provided' });
+    }
+    
     try {
-        let user = await User.findOne({ email });
-        if (user) return res.status(400).json({ msg: 'User already exists' });
-
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        user = new User({
-            username,
-            email,
-            password: hashedPassword,
-            // Add any additional fields for verification if needed
+        const result = await verifyFirebaseToken(idToken);
+        
+        if (result.success) {
+            // Token is valid, return user info
+            res.json({
+                success: true,
+                user: result.user,
+                msg: 'Authentication successful'
+            });
+        } else {
+            res.status(401).json({
+                success: false,
+                msg: 'Invalid token',
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('Token verification error:', error);
+        res.status(500).json({
+            success: false,
+            msg: 'Server error during authentication',
+            error: error.message
         });
-        await user.save();
-
-        // Optionally, generate a verification token and send email here
-        // const verificationToken = crypto.randomBytes(32).toString('hex');
-        // Save token to user or a separate collection, send email, etc.
-
-        // Respond with token and user info (like main branch)
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.json({ token, user: { id: user._id, username, email } });
-    } catch (err) {
-        res.status(500).json({ msg: 'Server Error', error: err.message });
     }
 };
 
-// LOGIN
-exports.loginUser = async (req, res) => {
-    const { email, password } = req.body;
+// Get current user info (protected route)
+exports.getCurrentUser = async (req, res) => {
     try {
-        const user = await User.findOne({ email });
-        if (!user) return res.status(400).json({ msg: 'Invalid credentials' });
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ msg: 'Invalid credentials' });
-
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-        res.json({ token, user: { id: user._id, username: user.username, email: user.email } });
-    } catch (err) {
-        res.status(500).json({ msg: 'Server Error', error: err.message });
+        // User info is already available from middleware
+        const userInfo = await getFirebaseUser(req.user.uid);
+        
+        if (userInfo.success) {
+            res.json({
+                success: true,
+                user: userInfo.user
+            });
+        } else {
+            res.status(404).json({
+                success: false,
+                msg: 'User not found',
+                error: userInfo.error
+            });
+        }
+    } catch (error) {
+        console.error('Get user error:', error);
+        res.status(500).json({
+            success: false,
+            msg: 'Server error',
+            error: error.message
+        });
     }
 };
 
-
+// Logout (client-side handles Firebase signOut, this is just for cleanup if needed)
+exports.logout = async (req, res) => {
+    try {
+        // Firebase handles logout on client side, but we can log it here
+        console.log('User logged out:', req.user?.email || 'Unknown user');
+        res.json({
+            success: true,
+            msg: 'Logout successful'
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({
+            success: false,
+            msg: 'Server error during logout',
+            error: error.message
+        });
+    }
+};
