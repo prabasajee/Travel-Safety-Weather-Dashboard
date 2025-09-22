@@ -5,6 +5,8 @@
 
   export default defineConfig({
     plugins: [react()],
+    // GitHub Pages deployment configuration
+    base: process.env.NODE_ENV === 'production' ? '/Travel-Safety-Weather-Dashboard/' : '/',
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {

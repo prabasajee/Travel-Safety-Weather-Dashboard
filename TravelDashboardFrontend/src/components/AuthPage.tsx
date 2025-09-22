@@ -1,14 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Eye, EyeOff, Globe, Mail, Lock, User, Plane } from 'lucide-react';
+import { Eye, EyeOff, Globe, Mail, Lock, User, Plane, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Checkbox } from './ui/checkbox';
+import { Alert, AlertDescription } from './ui/alert';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import firebaseAuth from '../firebase/config';
+import authService from '../firebase/authService';
 
 interface AuthPageProps {
   onLogin: (userData: any) => void;
+}
+
+interface FormData {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
 }
 
 export function AuthPage({ onLogin }: AuthPageProps) {
@@ -17,31 +27,138 @@ export function AuthPage({ onLogin }: AuthPageProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [waitingForVerification, setWaitingForVerification] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
 
+  useEffect(() => {
+    // Listen for auth state changes
+    const unsubscribe = firebaseAuth.onAuthStateChanged((user) => {
+      if (user && user.emailVerified) {
+        // User is authenticated and email is verified
+        console.log('User authenticated and verified:', user.email);
+        onLogin({
+          name: user.displayName || user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+          avatar: user.photoURL || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+          uid: user.uid,
+          emailVerified: user.emailVerified
+        });
+      } else if (user && !user.emailVerified) {
+        // User exists but email not verified - sign them out
+        console.log('User exists but not verified, signing out:', user.email);
+        firebaseAuth.signOut();
+        if (!waitingForVerification) {
+          setWaitingForVerification(true);
+          setMessage({
+            type: 'info',
+            text: 'Please check your email and click the verification link to complete registration. Check your spam folder if you don\'t see the email.'
+          });
+        }
+      } else if (!user && waitingForVerification) {
+        // User signed out while waiting for verification - this is expected
+        console.log('User signed out while waiting for verification');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [onLogin, waitingForVerification]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+    setMessage(null);
+
+    // Validation
+    if (!formData.email || !formData.password) {
+      setMessage({ type: 'error', text: 'Please fill in all required fields.' });
       setIsLoading(false);
-      onLogin({
-        name: formData.name || 'John Traveler',
-        email: formData.email || 'john@example.com',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face'
-      });
-    }, 2000);
+      return;
+    }
+
+    if (!isLogin) {
+      // Registration validation
+      if (!formData.name) {
+        setMessage({ type: 'error', text: 'Please enter your name.' });
+        setIsLoading(false);
+        return;
+      }
+      
+      if (formData.password !== formData.confirmPassword) {
+        setMessage({ type: 'error', text: 'Passwords do not match.' });
+        setIsLoading(false);
+        return;
+      }
+
+      if (formData.password.length < 6) {
+        setMessage({ type: 'error', text: 'Password must be at least 6 characters long.' });
+        setIsLoading(false);
+        return;
+      }
+
+      // Register user
+      try {
+        const result = await authService.register(formData.email, formData.password, formData.name);
+        if (result.success) {
+          setMessage({
+            type: 'success',
+            text: result.message || 'Registration successful! Please check your email for verification.'
+          });
+          setWaitingForVerification(true);
+          // Clear the form
+          setFormData({
+            name: '',
+            email: '',
+            password: '',
+            confirmPassword: ''
+          });
+          // Switch to login mode after showing success message
+          setTimeout(() => {
+            setIsLogin(true);
+          }, 3000);
+        } else {
+          setMessage({ type: 'error', text: result.message || 'Registration failed.' });
+        }
+      } catch (error) {
+        console.error('Registration error:', error);
+        setMessage({ type: 'error', text: 'An unexpected error occurred during registration.' });
+      }
+    } else {
+      // Login
+      try {
+        const result = await authService.login(formData.email, formData.password);
+        if (result.success) {
+          setMessage({ type: 'success', text: result.message || 'Login successful!' });
+          // onLogin will be called automatically by the auth state listener
+        } else {
+          setMessage({ type: 'error', text: result.message || 'Login failed.' });
+        }
+      } catch (error) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred during login.' });
+      }
+    }
+
+    setIsLoading(false);
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: keyof FormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleResendVerification = async () => {
+    setIsLoading(true);
+    const result = await authService.resendEmailVerification();
+    setMessage({
+      type: result.success ? 'success' : 'error',
+      text: result.message || (result.success ? 'Verification email sent!' : 'Failed to send verification email.')
+    });
+    setIsLoading(false);
   };
 
   return (
@@ -98,6 +215,59 @@ export function AuthPage({ onLogin }: AuthPageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Message Display */}
+              {message && (
+                <Alert className={`mb-4 ${message.type === 'error' ? 'border-red-500 bg-red-50' : 
+                  message.type === 'success' ? 'border-green-500 bg-green-50' : 'border-blue-500 bg-blue-50'}`}>
+                  {message.type === 'error' ? (
+                    <AlertCircle className="h-4 w-4" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4" />
+                  )}
+                  <AlertDescription className={message.type === 'error' ? 'text-red-700' : 
+                    message.type === 'success' ? 'text-green-700' : 'text-blue-700'}>
+                    {message.text}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Email Verification Waiting State */}
+              {waitingForVerification && (
+                <div className="mb-4 p-4 border border-yellow-500 bg-yellow-50 rounded-lg">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-yellow-800 font-medium">Waiting for Email Verification</p>
+                      <p className="text-yellow-700 text-sm">Check your inbox and click the verification link. After clicking the link, return here and try logging in.</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResendVerification}
+                        disabled={isLoading}
+                        className="text-yellow-800 border-yellow-500 hover:bg-yellow-100"
+                      >
+                        Resend Email
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setWaitingForVerification(false);
+                          setIsLogin(true);
+                          setMessage(null);
+                        }}
+                        className="text-blue-800 border-blue-500 hover:bg-blue-100"
+                      >
+                        I've Verified - Try Login
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 {!isLogin && (
                   <motion.div

@@ -1,6 +1,29 @@
 # Travel Safety & Weather Dashboard
 
-A comprehensive web application that provides travelers with essential safety information, weather conditions, and country details for informed travel decisions.
+A comprehensive web application that provides travelers with essential safety information,## 🔐 Authentication Setup
+
+For detailed authentication setup and testing instructions, see the **[Authentication Guide](AUTHENTICATION_GUIDE.md)**.
+
+The authentication system includes:
+- User registration with email verification
+- Secure Firebase authentication
+- Protected routes and API endpoints
+- Complete testing procedures
+
+## 🚀 Deployment
+
+This project is configured for automatic deployment to GitHub Pages using GitHub Actions.
+
+### Quick Deployment:
+1. **Push to GitHub**: Commit your changes to the `main` branch
+2. **Configure Secrets**: Add Firebase configuration as repository secrets
+3. **Enable Pages**: Set GitHub Pages source to "GitHub Actions"
+4. **Deploy**: Automatic deployment on every push
+
+For detailed deployment instructions, see the **[Deployment Guide](DEPLOYMENT_GUIDE.md)**.
+
+### Live Demo:
+🌐 **[View Live Application](https://prabasajee.github.io/Travel-Safety-Weather-Dashboard/)**conditions, and country details for informed travel decisions.
 
 ## 📋 Project Overview
 
@@ -15,7 +38,7 @@ This dashboard integrates multiple APIs to deliver:
 - 🌤️ **Weather Integration** - Current conditions and 5-day forecasts
 - ⚠️ **Safety Alerts** - Government travel advisories and warnings
 - 🌍 **Country Profiles** - Detailed country information
-- 🔐 **Secure Authentication** - OAuth 2.0 implementation
+- 🔐 **Secure Authentication** - Firebase authentication with email verification
 - 📱 **Responsive Design** - Mobile-friendly interface
 - 💾 **Data Storage** - MongoDB integration for user searches
 
@@ -127,7 +150,17 @@ Travel-Safety-Weather-Dashboard/
    npm start
    ```
 
-## 🔑 Environment Variables
+## � Authentication Setup
+
+For detailed authentication setup and testing instructions, see the **[Authentication Guide](AUTHENTICATION_GUIDE.md)**.
+
+The authentication system includes:
+- User registration with email verification
+- Secure Firebase authentication
+- Protected routes and API endpoints
+- Complete testing procedures
+
+## �🔑 Environment Variables
 
 Create a `.env` file in the root directory:
 

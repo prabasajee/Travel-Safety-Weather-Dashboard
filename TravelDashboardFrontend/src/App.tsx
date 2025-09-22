@@ -5,6 +5,8 @@ import { Button } from './components/ui/button';
 import { AuthPage } from './components/AuthPage';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
+import authService from './firebase/authService';
+import firebaseAuth from './firebase/config';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -13,17 +15,34 @@ export default function App() {
 
   // Check for stored user and theme on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
     const storedTheme = localStorage.getItem('theme');
-    
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
     
     if (storedTheme === 'dark') {
       setIsDarkMode(true);
       document.documentElement.classList.add('dark');
     }
+
+    // Listen for Firebase auth state changes
+    const unsubscribe = firebaseAuth.onAuthStateChanged((firebaseUser) => {
+      if (firebaseUser && firebaseUser.emailVerified) {
+        // User is authenticated and verified
+        const userData = {
+          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+          email: firebaseUser.email || '',
+          avatar: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+          uid: firebaseUser.uid,
+          emailVerified: firebaseUser.emailVerified
+        };
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+      } else {
+        // User is not authenticated or email not verified
+        setUser(null);
+        localStorage.removeItem('user');
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleLogin = (userData) => {
@@ -31,10 +50,26 @@ export default function App() {
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    setActiveSection('dashboard');
+  const handleLogout = async () => {
+    try {
+      // Use the auth service to properly logout
+      await authService.logout();
+      
+      // Clear user state and local storage
+      setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('authToken');
+      setActiveSection('dashboard');
+      
+      console.log('Logout successful');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force clear even if logout fails
+      setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('authToken');
+      setActiveSection('dashboard');
+    }
   };
 
   const toggleDarkMode = () => {

@@ -56,6 +56,10 @@
       },
       "scripts": {
             "dev": "vite",
-            "build": "vite build"
+            "build": "vite build",
+            "preview": "vite preview",
+            "build:github": "vite build --base=/Travel-Safety-Weather-Dashboard/",
+            "lint": "echo \"No linting configured\"",
+            "test": "echo \"No tests configured\""
       }
 }
