@@ -23,6 +23,7 @@ interface FormData {
 
 export function AuthPage({ onLogin }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(true);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -153,60 +154,66 @@ export function AuthPage({ onLogin }: AuthPageProps) {
 
   const handleResendVerification = async () => {
     setIsLoading(true);
-    const result = await authService.resendEmailVerification();
-    setMessage({
-      type: result.success ? 'success' : 'error',
-      text: result.message || (result.success ? 'Verification email sent!' : 'Failed to send verification email.')
-    });
+    try {
+      const result = await firebaseAuth.sendVerificationEmail();
+      if (result.success) {
+        setMessage({ type: 'success', text: result.message || 'Verification email sent!' });
+      } else {
+        setMessage({ type: 'error', text: result.message || 'Failed to send verification email.' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error sending verification email.' });
+    }
     setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen flex">
-      {/* Left side - Background Image */}
+      {/* Left side - Hero Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <ImageWithFallback
-          src="https://images.unsplash.com/photo-1669854310488-542a99280b8a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3b3JsZCUyMG1hcCUyMHRyYXZlbCUyMGFic3RyYWN0fGVufDF8fHx8MTc1NjMxNzA1M3ww&ixlib=rb-4.1.0&q=80&w=1080"
-          alt="Travel background"
-          className="w-full h-full object-cover"
+          src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?ixlib=rb-4.0.3&auto=format&fit=crop&w=1935&q=80"
+          alt="Travel safety dashboard"
+          className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600/80 to-purple-600/80" />
         <div className="absolute inset-0 flex items-center justify-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.5 }}
+            transition={{ duration: 0.8 }}
             className="text-center text-white px-8"
           >
-            <Plane className="h-16 w-16 mx-auto mb-6 animate-pulse" />
+            <div className="flex items-center justify-center mb-6">
+              <Globe className="h-16 w-16 mr-4" />
+              <Plane className="h-12 w-12" />
+            </div>
             <h2 className="text-4xl mb-4">Explore the World Safely</h2>
             <p className="text-lg opacity-90">Get real-time travel safety information and weather updates for any destination worldwide.</p>
           </motion.div>
         </div>
       </div>
 
-      {/* Right side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
+      {/* Right side - Auth Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gradient-to-br from-slate-50 to-slate-100">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.8 }}
           className="w-full max-w-md"
         >
-          <div className="text-center mb-8">
+          {registerSuccess && !isLogin && (
             <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 0.5, type: "spring" }}
-              className="flex items-center justify-center mb-4"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mb-6 p-4 border border-green-300 bg-green-50 rounded-lg"
             >
-              <Globe className="h-12 w-12 text-blue-600 mr-3" />
-              <h1 className="text-2xl">Travel Dashboard</h1>
+              <p className="text-green-700 font-medium flex items-center">
+                <CheckCircle className="h-5 w-5 mr-2" />
+                Registration successful! Please check your email to verify your account.
+              </p>
             </motion.div>
-            <p className="text-muted-foreground">
-              {isLogin ? 'Welcome back! Sign in to continue' : 'Create your account to get started'}
-            </p>
-          </div>
+          )}
 
           <Card className="shadow-xl border-0 bg-card/50 backdrop-blur-sm">
             <CardHeader className="space-y-1 pb-4">
@@ -282,7 +289,7 @@ export function AuthPage({ onLogin }: AuthPageProps) {
                         placeholder="Full Name"
                         value={formData.name}
                         onChange={(e) => handleInputChange('name', e.target.value)}
-                        className="pl-10 bg-input-background border-0"
+                        className="pl-10"
                       />
                     </div>
                   </motion.div>
@@ -295,7 +302,7 @@ export function AuthPage({ onLogin }: AuthPageProps) {
                     placeholder="Email Address"
                     value={formData.email}
                     onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="pl-10 bg-input-background border-0"
+                    className="pl-10"
                   />
                 </div>
 
@@ -306,7 +313,7 @@ export function AuthPage({ onLogin }: AuthPageProps) {
                     placeholder="Password"
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
-                    className="pl-10 pr-10 bg-input-background border-0"
+                    className="pl-10 pr-10"
                   />
                   <Button
                     type="button"
@@ -323,7 +330,7 @@ export function AuthPage({ onLogin }: AuthPageProps) {
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
-                    transition={{ duration: 0.3, delay: 0.1 }}
+                    transition={{ duration: 0.3 }}
                   >
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -332,7 +339,7 @@ export function AuthPage({ onLogin }: AuthPageProps) {
                         placeholder="Confirm Password"
                         value={formData.confirmPassword}
                         onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                        className="pl-10 pr-10 bg-input-background border-0"
+                        className="pl-10 pr-10"
                       />
                       <Button
                         type="button"
