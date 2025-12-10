@@ -11,7 +11,8 @@ import {
   X,
   Globe,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  MapPinCheckInside
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -30,10 +31,11 @@ export function Sidebar({ user, activeSection, onSectionChange, onLogout }: Side
 
   const menuItems = [
     { id: 'dashboard', icon: Home, label: 'Dashboard' },
-    { id: 'saved', icon: Bookmark, label: 'Saved Locations' },
-    { id: 'weather', icon: CloudRain, label: 'Weather Reports' },
-    { id: 'safety', icon: Shield, label: 'Travel Safety' },
-    { id: 'settings', icon: Settings, label: 'Settings' },
+    { id: 'submit', icon: Bookmark, label: 'Submit Data' },
+    { id: 'served', icon: MapPinCheckInside, label: 'Served Countries' },
+    { id: 'saved', icon: CloudRain, label: 'Saved Locations' },
+    { id: 'weather', icon: Shield, label: 'Weather Reports' },
+    { id: 'safety', icon: Settings, label: 'Travel Safety' },
   ];
 
   const sidebarVariants = {

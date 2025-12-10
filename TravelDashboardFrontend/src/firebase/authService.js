@@ -10,7 +10,13 @@ class AuthService {
 
     // Get the auth token from localStorage
     getToken() {
-        return localStorage.getItem('authToken');
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            console.warn('⚠️ No auth token found in localStorage');
+        } else {
+            console.log('✅ Auth token found, length:', token.length);
+        }
+        return token;
     }
 
     // Remove the auth token
@@ -45,24 +51,10 @@ class AuthService {
                 return result;
             }
 
-            console.log('AuthService: Firebase sign in successful, checking email verification...');
+            console.log('AuthService: Firebase sign in successful...');
             
             // Get the current user (should be freshly loaded from signIn)
             const user = result.user;
-            console.log('AuthService: Email verified status:', user.emailVerified);
-            
-            if (!user.emailVerified) {
-                console.log('AuthService: Email not verified, signing out user');
-                // Sign out the user since they can't proceed
-                await firebaseAuth.signOut();
-                return {
-                    success: false,
-                    message: 'Please verify your email before signing in. Check your inbox for the verification link. If you have already verified, try refreshing the page and logging in again.',
-                    requiresEmailVerification: true
-                };
-            }
-
-            console.log('AuthService: Email verified, proceeding with backend verification...');
 
             // Get the Firebase ID token
             const tokenResult = await firebaseAuth.getIdToken();

@@ -50,28 +50,10 @@ export const firebaseAuth = {
                 console.log('Profile updated with display name:', displayName);
             }
             
-            // Send email verification with custom settings
-            const actionCodeSettings = {
-                // URL the user will be redirected to after clicking the email verification link
-                // For production, this should be your GitHub Pages URL
-                url: window.location.origin + (import.meta.env.PROD ? '/Travel-Safety-Weather-Dashboard/' : '/login'),
-                // This must be true for email verification
-                handleCodeInApp: false,
-            };
-
-            console.log('Sending email verification to:', userCredential.user.email);
-            await sendEmailVerification(userCredential.user, actionCodeSettings);
-            console.log('Verification email sent successfully');
-            
-            // Sign out the user immediately after registration to force email verification
-            await signOut(auth);
-            console.log('User signed out to enforce email verification');
-            
             return {
                 success: true,
                 user: userCredential.user,
-                message: 'Account created successfully! A verification email has been sent to ' + email + '. Please check your email (including spam folder) and click the verification link before signing in.',
-                requiresEmailVerification: true
+                message: 'Account created successfully! You can now sign in with your credentials.'
             };
         } catch (error) {
             console.error('Registration error:', error);
@@ -88,12 +70,6 @@ export const firebaseAuth = {
         try {
             console.log('Attempting to sign in with email:', email);
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            
-            // Reload the user to get the latest emailVerified status
-            console.log('User signed in, reloading to check email verification status...');
-            await userCredential.user.reload();
-            
-            console.log('Email verified status:', userCredential.user.emailVerified);
             
             return {
                 success: true,
