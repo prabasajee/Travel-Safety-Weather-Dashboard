@@ -5,6 +5,8 @@ import { Button } from './components/ui/button';
 import { AuthPage } from './components/AuthPage';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
+import { TravelDataManager } from './components/TravelDataManager';
+import { ServedList } from './components/ServedList';
 import authService from './firebase/authService';
 import firebaseAuth from './firebase/config';
 
@@ -24,19 +26,18 @@ export default function App() {
 
     // Listen for Firebase auth state changes
     const unsubscribe = firebaseAuth.onAuthStateChanged((firebaseUser) => {
-      if (firebaseUser && firebaseUser.emailVerified) {
-        // User is authenticated and verified
+      if (firebaseUser) {
+        // User is authenticated
         const userData = {
           name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
           email: firebaseUser.email || '',
           avatar: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-          uid: firebaseUser.uid,
-          emailVerified: firebaseUser.emailVerified
+          uid: firebaseUser.uid
         };
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
       } else {
-        // User is not authenticated or email not verified
+        // User is not authenticated
         setUser(null);
         localStorage.removeItem('user');
       }
@@ -82,6 +83,10 @@ export default function App() {
     switch (activeSection) {
       case 'dashboard':
         return <Dashboard />;
+      case 'submit':
+        return <TravelDataManager />;
+      case 'served':
+        return <ServedList />;
       case 'saved':
         return (
           <div className="container mx-auto px-6 py-8">

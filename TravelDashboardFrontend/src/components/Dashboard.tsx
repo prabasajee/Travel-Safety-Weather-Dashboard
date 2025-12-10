@@ -1,19 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Search, MapPin, TrendingUp, AlertTriangle, Sun, Cloud, CloudRain, Users, DollarSign, Thermometer } from 'lucide-react';
+import { Search, MapPin, TrendingUp, AlertTriangle, Sun, Cloud, CloudRain, Users, DollarSign, Thermometer, Heart, Trash2, Save } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import authService from '../firebase/authService';
+import firebaseAuth from '../firebase/config';
+import databaseService from '../firebase/databaseService';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+
+// Helper to get fresh Firebase token
+const getFreshToken = async () => {
+  const tokenResult = await firebaseAuth.getIdToken();
+  if (tokenResult.success) {
+    return tokenResult.token;
+  }
+  return authService.getToken();
+};
 
 export function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [travelHistory, setTravelHistory] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedMessage, setSavedMessage] = useState('');
+  const [isServing, setIsServing] = useState(false);
 
-  // Mock data for demonstration
+  // Mock data for demonstration (fallback only)
   const mockData = {
     location: 'Tokyo, Japan',
     travelSafety: {
@@ -67,13 +88,160 @@ export function Dashboard() {
   const handleSearch = async () => {
     if (searchQuery.trim()) {
       setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
+      setError(null);
+      setSavedMessage('');
+      try {
+        const token = await getFreshToken();
+        const response = await fetch(`${API_BASE_URL}/api/travel/search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ location: searchQuery })
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.success) {
+          setSearchResults(data.data);
+        } else {
+          throw new Error(data.message || 'Failed to fetch travel information');
+        }
+      } catch (err) {
+        console.error('Search error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch travel information. Please try again.');
+        // Fallback to mock data if API fails
         setSearchResults(mockData);
+      } finally {
         setIsLoading(false);
-      }, 1500);
+      }
     }
   };
+
+  // Save current search results to database
+  const handleSaveTravel = async () => {
+    if (!searchResults) return;
+
+    setIsSaving(true);
+    try {
+      const result = await databaseService.saveTravelData(searchResults);
+      if (result.success) {
+        setSavedMessage('✅ Travel data saved to MongoDB!');
+        setTimeout(() => setSavedMessage(''), 3000);
+        // Refresh favorites list
+        loadFavorites();
+      } else {
+        setSavedMessage('❌ Failed to save travel data');
+      }
+    } catch (error) {
+      console.error('Error saving travel data:', error);
+      setSavedMessage('❌ Error saving travel data');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add country to served list
+  const handleServeCountry = async () => {
+    if (!searchResults) return;
+
+    setIsServing(true);
+    try {
+      const token = await getFreshToken();
+      const response = await fetch(`${API_BASE_URL}/api/served-list`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          country: searchResults.location.split(',')[0].trim(), // Extract country name from location
+          safetyScore: searchResults.safety?.score || 75,
+          safetyLevel: searchResults.safety?.level || 'Safe',
+          weather: searchResults.weather?.current?.condition || 'Sunny',
+          temperature: searchResults.weather?.current?.temp || 20,
+          notes: searchResults.safety?.advisory || ''
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setSavedMessage('✅ Country added to Served List!');
+        setTimeout(() => setSavedMessage(''), 3000);
+      } else {
+        setSavedMessage('❌ Failed to add to Served List');
+      }
+    } catch (error) {
+      console.error('Error adding to served list:', error);
+      setSavedMessage('❌ Error adding to Served List');
+    } finally {
+      setIsServing(false);
+    }
+  };
+
+  // Load travel history from database
+  const loadTravelHistory = async () => {
+    try {
+      const result = await databaseService.getTravelHistory(50, 0);
+      if (result.success) {
+        setTravelHistory(result.data);
+      }
+    } catch (error) {
+      console.error('Error loading history:', error);
+    }
+  };
+
+  // Load favorite destinations
+  const loadFavorites = async () => {
+    try {
+      const result = await databaseService.getFavoriteDestinations();
+      if (result.success) {
+        setFavorites(result.data);
+      }
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
+
+  // Toggle favorite status
+  const handleToggleFavorite = async (historyId: string, currentFavorite: boolean) => {
+    try {
+      const result = await databaseService.toggleFavorite(historyId, !currentFavorite);
+      if (result.success) {
+        loadFavorites();
+        loadTravelHistory();
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  // Delete travel history entry
+  const handleDeleteHistory = async (historyId: string) => {
+    try {
+      const result = await databaseService.deleteTravelHistory(historyId);
+      if (result.success) {
+        loadTravelHistory();
+        loadFavorites();
+      }
+    } catch (error) {
+      console.error('Error deleting history:', error);
+    }
+  };
+
+  // Load data on component mount
+  useEffect(() => {
+    loadTravelHistory();
+    loadFavorites();
+  }, []);
 
   const getSafetyColor = (level) => {
     switch (level.toLowerCase()) {
@@ -160,6 +328,131 @@ export function Dashboard() {
           </div>
         </motion.div>
 
+        {/* Action Buttons - Save & History */}
+        {searchResults && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="max-w-2xl mx-auto mb-6 flex gap-4 justify-center flex-wrap"
+          >
+            <Button
+              onClick={handleSaveTravel}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+            >
+              <Save className="h-4 w-4" />
+              {isSaving ? 'Saving...' : 'Save to Database'}
+            </Button>
+            <Button
+              onClick={handleServeCountry}
+              disabled={isServing}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700"
+            >
+              <MapPin className="h-4 w-4" />
+              {isServing ? 'Adding...' : '➕ Add to Served List'}
+            </Button>
+            <Button
+              onClick={() => setShowHistory(!showHistory)}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <MapPin className="h-4 w-4" />
+              Travel History ({travelHistory.length})
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Save Confirmation Message */}
+        {savedMessage && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-2xl mx-auto mb-6 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-center text-sm"
+          >
+            {savedMessage}
+          </motion.div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-2xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700"
+          >
+            {error}
+          </motion.div>
+        )}
+
+        {/* Travel History Display */}
+        {showHistory && travelHistory.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-6xl mx-auto mb-12"
+          >
+            <Card className="bg-gradient-to-br from-card to-card/50 backdrop-blur-sm border-0 shadow-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Your Travel History ({travelHistory.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {travelHistory.map((history: any) => (
+                    <div
+                      key={history._id}
+                      className="p-4 bg-card/50 rounded-lg border border-border/50 hover:border-blue-500 transition-colors"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h4 className="font-semibold text-lg">{history.location}</h4>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(history.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleToggleFavorite(history._id, history.isFavorite)}
+                            className="p-1 hover:bg-yellow-100 rounded transition-colors"
+                            title={history.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                          >
+                            <Heart className={`h-4 w-4 ${history.isFavorite ? 'fill-yellow-500 text-yellow-500' : 'text-muted-foreground'}`} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteHistory(history._id)}
+                            className="p-1 hover:bg-red-100 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <p>
+                          <span className="text-muted-foreground">Safety: </span>
+                          <Badge variant="secondary">{history.safety?.level || 'N/A'}</Badge>
+                        </p>
+                        <p>
+                          <span className="text-muted-foreground">Weather: </span>
+                          <span className="font-medium">{history.weather?.current?.condition || 'N/A'}</span>
+                        </p>
+                        {history.rating > 0 && (
+                          <p>
+                            <span className="text-muted-foreground">Rating: </span>
+                            <span className="font-medium">⭐ {history.rating}/5</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Loading State */}
         {isLoading && (
           <motion.div
@@ -218,21 +511,21 @@ export function Dashboard() {
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
                       <span>Safety Level</span>
-                      <Badge className={`${getSafetyColor(searchResults.travelSafety.level)} text-white shadow-lg`}>
-                        {searchResults.travelSafety.level}
+                      <Badge className={`${getSafetyColor(searchResults.safety?.level || 'Caution')} text-white shadow-lg`}>
+                        {searchResults.safety?.level || 'N/A'}
                       </Badge>
                     </div>
                     
                     <div className="space-y-3">
                       <div className="flex justify-between text-sm">
                         <span>Safety Score</span>
-                        <span className="font-medium">{searchResults.travelSafety.score}/100</span>
+                        <span className="font-medium">{searchResults.safety?.score || 0}/100</span>
                       </div>
                       <div className="relative">
-                        <Progress value={searchResults.travelSafety.score} className="h-3" />
+                        <Progress value={searchResults.safety?.score || 0} className="h-3" />
                         <motion.div
                           initial={{ width: 0 }}
-                          animate={{ width: `${searchResults.travelSafety.score}%` }}
+                          animate={{ width: `${searchResults.safety?.score || 0}%` }}
                           transition={{ duration: 1.5, delay: 0.5 }}
                           className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full"
                         />
@@ -240,7 +533,7 @@ export function Dashboard() {
                     </div>
                     
                     <div className="bg-muted/50 p-4 rounded-lg">
-                      <p className="text-sm leading-relaxed">{searchResults.travelSafety.advisory}</p>
+                      <p className="text-sm leading-relaxed">{searchResults.safety?.advisory || 'No advisory available'}</p>
                     </div>
 
                     {/* Safety Trend Chart */}
@@ -251,7 +544,7 @@ export function Dashboard() {
                       </h4>
                       <div className="h-32">
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={searchResults.travelSafety.trends}>
+                          <LineChart data={searchResults.safety?.trends || []}>
                             <Line type="monotone" dataKey="score" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', strokeWidth: 2 }} />
                             <XAxis dataKey="month" axisLine={false} tickLine={false} className="text-xs" />
                             <Tooltip />
@@ -289,7 +582,7 @@ export function Dashboard() {
                         transition={{ duration: 0.5, delay: 0.8, type: "spring" }}
                         className="flex items-center justify-center mb-3"
                       >
-                        {getWeatherIcon(searchResults.weather.current.condition)}
+                        {getWeatherIcon(searchResults.weather?.current?.condition || 'Sunny')}
                       </motion.div>
                       <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -297,12 +590,12 @@ export function Dashboard() {
                         transition={{ delay: 1 }}
                         className="text-4xl font-light mb-2"
                       >
-                        {searchResults.weather.current.temp}°C
+                        {searchResults.weather?.current?.temp || 0}°C
                       </motion.div>
-                      <p className="text-muted-foreground">{searchResults.weather.current.condition}</p>
+                      <p className="text-muted-foreground">{searchResults.weather?.current?.condition || 'N/A'}</p>
                       <div className="flex justify-center space-x-4 mt-3 text-sm text-muted-foreground">
-                        <span>Humidity: {searchResults.weather.current.humidity}%</span>
-                        <span>Wind: {searchResults.weather.current.windSpeed} km/h</span>
+                        <span>Humidity: {searchResults.weather?.current?.humidity || 0}%</span>
+                        <span>Wind: {searchResults.weather?.current?.windSpeed || 0} km/h</span>
                       </div>
                     </div>
                     
@@ -310,7 +603,7 @@ export function Dashboard() {
                     <div>
                       <h4 className="text-sm font-medium mb-3">4-Day Forecast</h4>
                       <div className="space-y-2">
-                        {searchResults.weather.forecast.map((day, index) => (
+                        {(searchResults.weather?.forecast || []).map((day, index) => (
                           <motion.div
                             key={index}
                             initial={{ opacity: 0, x: -20 }}
@@ -320,10 +613,10 @@ export function Dashboard() {
                           >
                             <span className="text-sm font-medium">{day.day}</span>
                             <div className="flex items-center space-x-2">
-                              {getWeatherIcon(day.condition)}
+                              {getWeatherIcon(day.condition || 'Sunny')}
                               <span className="text-sm">{day.temp}°C</span>
                             </div>
-                            <span className="text-xs text-muted-foreground">{day.condition}</span>
+                            <span className="text-xs text-muted-foreground">{day.condition || 'N/A'}</span>
                           </motion.div>
                         ))}
                       </div>
@@ -334,7 +627,7 @@ export function Dashboard() {
                       <h4 className="text-sm font-medium mb-3">Weekly Temperature</h4>
                       <div className="h-32">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={searchResults.weather.weeklyData}>
+                          <BarChart data={searchResults.weather?.weeklyData || []}>
                             <Bar dataKey="temp" fill="#3b82f6" radius={4} />
                             <XAxis dataKey="day" axisLine={false} tickLine={false} className="text-xs" />
                             <Tooltip />
@@ -370,16 +663,16 @@ export function Dashboard() {
                       transition={{ duration: 0.5, delay: 1.4, type: "spring" }}
                       className="text-center p-4 bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-xl"
                     >
-                      <div className="text-6xl mb-3">{searchResults.countryInfo.flag}</div>
-                      <h3 className="text-xl font-medium">Japan</h3>
-                      <p className="text-sm text-muted-foreground">{searchResults.countryInfo.capital}</p>
+                      <div className="text-6xl mb-3">{searchResults.countryInfo?.flag || '🌍'}</div>
+                      <h3 className="text-xl font-medium">{searchResults.location || 'Location'}</h3>
+                      <p className="text-sm text-muted-foreground">{searchResults.countryInfo?.capital || 'N/A'}</p>
                     </motion.div>
                     
                     <div className="space-y-4">
                       {[
-                        { icon: Users, label: 'Population', value: searchResults.countryInfo.population },
-                        { icon: DollarSign, label: 'Currency', value: searchResults.countryInfo.currency },
-                        { icon: MapPin, label: 'Language', value: searchResults.countryInfo.language },
+                        { icon: Users, label: 'Population', value: searchResults.countryInfo?.population || 'N/A' },
+                        { icon: DollarSign, label: 'Currency', value: searchResults.countryInfo?.currency || 'N/A' },
+                        { icon: MapPin, label: 'Language', value: searchResults.countryInfo?.language || 'N/A' },
                       ].map((item, index) => (
                         <motion.div
                           key={index}
@@ -406,7 +699,7 @@ export function Dashboard() {
                       className="p-3 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 rounded-lg"
                     >
                       <p className="text-xs text-muted-foreground text-center">
-                        Timezone: {searchResults.countryInfo.timezone}
+                        Timezone: {searchResults.countryInfo?.timezone || 'N/A'}
                       </p>
                     </motion.div>
                   </CardContent>

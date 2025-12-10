@@ -51,17 +51,6 @@ export function AuthPage({ onLogin }: AuthPageProps) {
           uid: user.uid,
           emailVerified: user.emailVerified
         });
-      } else if (user && !user.emailVerified) {
-        // User exists but email not verified - sign them out
-        console.log('User exists but not verified, signing out:', user.email);
-        firebaseAuth.signOut();
-        if (!waitingForVerification) {
-          setWaitingForVerification(true);
-          setMessage({
-            type: 'info',
-            text: 'Please check your email and click the verification link to complete registration. Check your spam folder if you don\'t see the email.'
-          });
-        }
       } else if (!user && waitingForVerification) {
         // User signed out while waiting for verification - this is expected
         console.log('User signed out while waiting for verification');

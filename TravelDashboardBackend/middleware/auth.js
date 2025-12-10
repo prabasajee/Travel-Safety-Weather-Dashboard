@@ -19,16 +19,6 @@ const authenticateToken = async (req, res, next) => {
         const result = await verifyFirebaseToken(token);
 
         if (result.success) {
-            // Check if email is verified for protected routes
-            if (!result.user.email_verified) {
-                return res.status(403).json({
-                    success: false,
-                    msg: 'Email verification required to access this resource',
-                    error: 'email_not_verified',
-                    requiresEmailVerification: true
-                });
-            }
-
             // Add user info to request object
             req.user = {
                 uid: result.user.uid,
